@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HCW Leads">
+<meta name="theme-color" content="#111111">
+<title>HCW Lead Triage</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #111111; --surface: #1c1c1c; --surface2: #252525; --border: #2e2e2e;
+    --text: #f0ede8; --muted: #777; --accent: #c8a96e;
+    --t1: #2a7a5a; --t1-bg: #0f2e20; --t1-text: #5fcea0; --t1-border: #1d5c3d;
+    --t2: #8a6a1a; --t2-bg: #2a2008; --t2-text: #d4a83a; --t2-border: #5a4510;
+    --t3: #8a3020; --t3-bg: #2a1008; --t3-text: #d06040; --t3-border: #5a2010;
+    --deny-bg: #1e0a0a; --deny-text: #d04040; --deny-border: #5a1010;
+    --radius: 14px; --radius-sm: 10px;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100dvh; overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  header {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(17,17,17,0.94);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    padding: env(safe-area-inset-top,0px) 20px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .header-inner { display: flex; align-items: center; justify-content: space-between; padding: 13px 0; }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo-mark { width: 32px; height: 32px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #111; }
+  .logo-text { font-size: 16px; font-weight: 600; letter-spacing: -0.3px; }
+  .logo-sub { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .clock { text-align: right; }
+  .clock-time { font-size: 15px; font-weight: 500; }
+  .clock-day { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .tab-bar { display: flex; border-bottom: 1px solid var(--border); }
+  .tab { flex: 1; padding: 11px 0; font-size: 13px; font-weight: 500; color: var(--muted); text-align: center; cursor: pointer; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  main { padding: 18px 18px calc(24px + env(safe-area-inset-bottom,0px)); }
+  .page { display: none; }
+  .page.active { display: block; }
+  .step-indicator { display: flex; align-items: center; margin-bottom: 6px; margin-top: 4px; }
+  .step-dot { width: 26px; height: 26px; border-radius: 50%; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; color: var(--muted); flex-shrink: 0; }
+  .step-dot.active { border-color: var(--accent); color: var(--accent); }
+  .step-dot.done { background: var(--accent); border-color: var(--accent); color: #111; }
+  .step-line { flex: 1; height: 1px; background: var(--border); }
+  .step-line.done { background: var(--accent); }
+  .step-labels { display: flex; justify-content: space-between; margin-bottom: 16px; }
+  .step-lbl { font-size: 11px; color: var(--muted); }
+  .step-lbl.active { color: var(--accent); }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); margin-bottom: 10px; overflow: visible; position: relative; }
+  .field-label { font-size: 12px; color: var(--muted); padding: 12px 16px 6px; }
+  .search-wrap { position: relative; }
+  .search-input { width: 100%; background: transparent; border: none; color: var(--text); font-size: 16px; font-family: inherit; padding: 0 44px 12px 16px; outline: none; }
+  .search-input::placeholder { color: var(--muted); }
+  .clear-btn { position: absolute; right: 14px; top: 50%; transform: translateY(-60%); width: 22px; height: 22px; border-radius: 50%; background: var(--surface2); border: none; color: var(--muted); font-size: 13px; cursor: pointer; display: none; align-items: center; justify-content: center; line-height: 1; }
+  .clear-btn.show { display: flex; }
+  .dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); z-index: 100; overflow: hidden; max-height: 240px; overflow-y: auto; display: none; }
+  .dropdown.show { display: block; }
+  .dropdown-item { padding: 11px 16px; font-size: 15px; cursor: pointer; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .dropdown-item:last-child { border-bottom: none; }
+  .dropdown-item:active { background: var(--surface); }
+  .tier-badge-sm { font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 10px; }
+  .tb-1 { background: var(--t1-bg); color: var(--t1-text); border: 1px solid var(--t1-border); }
+  .tb-2 { background: var(--t2-bg); color: var(--t2-text); border: 1px solid var(--t2-border); }
+  .tb-3 { background: var(--t3-bg); color: var(--t3-text); border: 1px solid var(--t3-border); }
+  .no-results { padding: 12px 16px; font-size: 14px; color: var(--muted); }
+  .proj-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 0 14px 14px; }
+  .proj-btn { background: var(--surface2); border: 1.5px solid var(--border); border-radius: var(--radius-sm); padding: 10px 8px; text-align: center; cursor: pointer; }
+  .proj-btn.selected { border-color: var(--accent); background: rgba(200,169,110,0.1); }
+  .proj-icon { font-size: 20px; margin-bottom: 4px; }
+  .proj-name { font-size: 12px; color: var(--text); line-height: 1.3; }
+  .proj-tier-label { font-size: 10px; color: var(--muted); margin-top: 3px; }
+  .datetime-row { display: grid; grid-template-columns: 1fr 1fr; }
+  .dt-cell { padding: 0 16px 12px; }
+  .dt-cell:first-child { border-right: 1px solid var(--border); }
+  input[type="date"], input[type="time"] { width: 100%; background: transparent; border: none; color: var(--text); font-size: 16px; font-family: inherit; outline: none; cursor: pointer; padding: 0; color-scheme: dark; }
+  input[type="date"]::-webkit-calendar-picker-indicator, input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(0.5); cursor: pointer; }
+  .detail-input { width: 100%; background: transparent; border: none; color: var(--text); font-size: 15px; font-family: inherit; padding: 0 16px 12px; outline: none; }
+  .detail-input::placeholder { color: var(--muted); }
+  textarea.detail-input { resize: none; line-height: 1.5; }
+  .input-divider { height: 1px; background: var(--border); }
+  .primary-btn { width: 100%; background: var(--accent); color: #111; font-size: 17px; font-weight: 600; font-family: inherit; border: none; border-radius: var(--radius); padding: 16px; margin: 6px 0 0; cursor: pointer; }
+  .primary-btn:active { opacity: 0.82; }
+  .secondary-btn { width: 100%; background: transparent; border: 1px solid var(--border); color: var(--muted); font-size: 15px; font-family: inherit; padding: 13px; border-radius: var(--radius); cursor: pointer; margin-top: 10px; }
+  .next-step-btn { width: 100%; background: var(--surface2); border: 1px solid var(--accent); color: var(--accent); font-size: 15px; font-weight: 600; font-family: inherit; padding: 14px; border-radius: var(--radius); cursor: pointer; margin-top: 4px; }
+  .after-hours-banner { background: rgba(200,169,110,0.08); border: 1px solid rgba(200,169,110,0.25); border-radius: var(--radius-sm); padding: 11px 13px; margin-bottom: 10px; font-size: 13px; color: var(--accent); line-height: 1.5; display: none; }
+  .after-hours-banner.show { display: block; }
+  .result-card { border-radius: var(--radius); padding: 18px; margin-bottom: 10px; border: 1px solid; }
+  .r-t1 { background: var(--t1-bg); border-color: var(--t1-border); }
+  .r-t2 { background: var(--t2-bg); border-color: var(--t2-border); }
+  .r-t3 { background: var(--t3-bg); border-color: var(--t3-border); }
+  .r-deny { background: var(--deny-bg); border-color: var(--deny-border); }
+  .result-eyebrow { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 5px; }
+  .r-t1 .result-eyebrow { color: var(--t1-text); }
+  .r-t2 .result-eyebrow { color: var(--t2-text); }
+  .r-t3 .result-eyebrow { color: var(--t3-text); }
+  .r-deny .result-eyebrow { color: var(--deny-text); }
+  .result-headline { font-size: 21px; font-weight: 700; letter-spacing: -0.4px; margin-bottom: 7px; color: var(--text); }
+  .result-desc { font-size: 13px; line-height: 1.6; color: rgba(240,237,232,0.65); }
+  .pill-row { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 10px; }
+  .pill { font-size: 11px; padding: 3px 9px; border-radius: 20px; border: 1px solid; }
+  .r-t1 .pill { border-color: var(--t1); color: var(--t1-text); }
+  .r-t2 .pill { border-color: var(--t2); color: var(--t2-text); }
+  .r-t3 .pill { border-color: var(--t3); color: var(--t3-text); }
+  .script-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 8px; }
+  .script-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 15px; margin-bottom: 10px; font-size: 13px; line-height: 1.7; color: var(--text); white-space: pre-line; }
+  .action-row { display: flex; gap: 9px; margin-bottom: 10px; }
+  .copy-btn, .wa-btn { flex: 1; padding: 13px 8px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; font-family: inherit; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+  .copy-btn { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+  .wa-btn { background: #25D366; color: #fff; }
+  .coverage-intro { font-size: 13px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+  .tier-section { margin-bottom: 12px; }
+  .tier-header-row { display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+  .tier-header-row.open { border-radius: var(--radius) var(--radius) 0 0; border-bottom-color: transparent; }
+  .tier-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .dot-t1 { background: var(--t1-text); } .dot-t2 { background: var(--t2-text); } .dot-t3 { background: var(--t3-text); }
+  .tier-header-label { flex: 1; }
+  .tier-header-name { font-size: 14px; font-weight: 600; color: var(--text); }
+  .tier-header-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .chevron { font-size: 12px; color: var(--muted); transition: transform 0.2s; }
+  .tier-header-row.open .chevron { transform: rotate(180deg); }
+  .tier-body { background: var(--surface); border: 1px solid var(--border); border-top: none; border-radius: 0 0 var(--radius) var(--radius); display: none; padding: 4px 0 12px; }
+  .tier-body.open { display: block; }
+  .region-block { padding: 10px 16px 4px; }
+  .region-name { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .city-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+  .city-item { font-size: 13px; color: var(--text); padding: 3px 0; }
+  .coverage-note { font-size: 12px; color: var(--muted); margin-top: 14px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); line-height: 1.5; }
+</style>
+</head>
+<body>
+<header>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-mark">HCW</div>
+      <div>
+        <div class="logo-text">Lead Triage</div>
+        <div class="logo-sub">HCW Studio</div>
+      </div>
+    </div>
+    <div class="clock">
+      <div class="clock-time" id="clock-time"></div>
+      <div class="clock-day" id="clock-day"></div>
+    </div>
+  </div>
+  <div class="tab-bar">
+    <div class="tab active" onclick="showPage('triage',this)">Triage</div>
+    <div class="tab" onclick="showPage('coverage',this)">Coverage map</div>
+  </div>
+</header>
+<main>
+  <div class="page active" id="page-triage">
+    <div id="step1-view">
+      <div class="step-indicator">
+        <div class="step-dot active">1</div>
+        <div class="step-line"></div>
+        <div class="step-dot">2</div>
+      </div>
+      <div class="step-labels">
+        <span class="step-lbl active">Lead details</span>
+        <span class="step-lbl">Client info</span>
+      </div>
+      <div class="card" style="overflow:visible;">
+        <div class="field-label">Client city</div>
+        <div class="search-wrap">
+          <input class="search-input" id="city-input" type="text" placeholder="Type to search city…" autocomplete="off" oninput="onCityInput()" onblur="hideDropdownDelayed()">
+          <button class="clear-btn" id="city-clear" onclick="clearCity()">×</button>
+          <div class="dropdown" id="city-dropdown"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="field-label">Project type</div>
+        <div class="proj-grid" id="proj-grid"></div>
+      </div>
+      <div class="card">
+        <div class="field-label">Appointment</div>
+        <div class="datetime-row">
+          <div class="dt-cell"><input type="date" id="appt-date"></div>
+          <div class="dt-cell"><input type="time" id="appt-time"></div>
+        </div>
+      </div>
+      <button class="primary-btn" onclick="triage()">Determine tier →</button>
+      <div style="font-size:12px;color:var(--muted);text-align:center;margin-top:12px;line-height:1.5;" id="hours-note"></div>
+    </div>
+    <div id="result1-view" style="display:none;">
+      <div class="after-hours-banner" id="after-hours-banner"></div>
+      <div class="result-card" id="result-card1"></div>
+      <div id="script-wrap1">
+        <div class="script-label">Team WhatsApp message</div>
+        <div class="script-box" id="script-text1"></div>
+        <div class="action-row">
+          <button class="copy-btn" id="copy-btn1" onclick="copyMsg(1)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy message
+          </button>
+          <a class="wa-btn" href="#" onclick="openWA(event,1)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+            Open WhatsApp
+          </a>
+        </div>
+      </div>
+      <button class="next-step-btn" id="next-btn" onclick="goStep2()">Lead accepted — add client details →</button>
+      <button class="secondary-btn" onclick="resetAll()">← New lead</button>
+    </div>
+    <div id="step2-view" style="display:none;">
+      <div class="step-indicator">
+        <div class="step-dot done">✓</div>
+        <div class="step-line done"></div>
+        <div class="step-dot active">2</div>
+      </div>
+      <div class="step-labels">
+        <span class="step-lbl">Lead triaged</span>
+        <span class="step-lbl active">Client info</span>
+      </div>
+      <div class="card">
+        <div class="field-label">Client name</div>
+        <input class="detail-input" id="client-name" type="text" placeholder="Full name…">
+        <div class="input-divider"></div>
+        <div class="field-label">Address</div>
+        <input class="detail-input" id="client-address" type="text" placeholder="Full address…">
+        <div class="input-divider"></div>
+        <div class="field-label">Phone</div>
+        <input class="detail-input" id="client-phone" type="tel" placeholder="Phone number…">
+      </div>
+      <div class="card">
+        <div class="field-label">Additional scope details</div>
+        <textarea class="detail-input" id="client-scope" rows="4" placeholder="Any extra details on the scope of work…"></textarea>
+      </div>
+      <button class="primary-btn" onclick="buildBriefing()">Generate team briefing →</button>
+      <button class="secondary-btn" onclick="goBackToResult1()">← Back to triage</button>
+    </div>
+    <div id="result2-view" style="display:none;">
+      <div class="step-indicator">
+        <div class="step-dot done">✓</div>
+        <div class="step-line done"></div>
+        <div class="step-dot done">✓</div>
+      </div>
+      <div class="step-labels">
+        <span class="step-lbl">Lead triaged</span>
+        <span class="step-lbl">Briefing ready</span>
+      </div>
+      <div class="script-label" style="margin-top:6px;">Complete team briefing</div>
+      <div class="script-box" id="script-text2"></div>
+      <div class="action-row">
+        <button class="copy-btn" id="copy-btn2" onclick="copyMsg(2)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+          Copy message
+        </button>
+        <a class="wa-btn" href="#" onclick="openWA(event,2)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+          Open WhatsApp
+        </a>
+      </div>
+      <button class="secondary-btn" onclick="resetAll()">← New lead</button>
+    </div>
+  </div>
+  <div class="page" id="page-coverage">
+    <p class="coverage-intro" style="margin-top:4px;">Tap a tier to see all cities covered. Location sets the floor — project type can escalate further.</p>
+    <div class="tier-section">
+      <div class="tier-header-row open" onclick="toggleTier(this)">
+        <div class="tier-dot dot-t1"></div>
+        <div class="tier-header-label">
+          <div class="tier-header-name">Tier 1 — core zone</div>
+          <div class="tier-header-sub">Auto-accept · Thousand Oaks to Long Beach</div>
+        </div><div class="chevron">▼</div>
+      </div>
+      <div class="tier-body open" id="body-t1"></div>
+    </div>
+    <div class="tier-section">
+      <div class="tier-header-row" onclick="toggleTier(this)">
+        <div class="tier-dot dot-t2"></div>
+        <div class="tier-header-label">
+          <div class="tier-header-name">Tier 2 — extended zone</div>
+          <div class="tier-header-sub">Founders align · ~5 mi beyond core</div>
+        </div><div class="chevron">▼</div>
+      </div>
+      <div class="tier-body" id="body-t2"></div>
+    </div>
+    <div class="tier-section">
+      <div class="tier-header-row" onclick="toggleTier(this)">
+        <div class="tier-dot dot-t3"></div>
+        <div class="tier-header-label">
+          <div class="tier-header-name">Tier 3 — outer zone</div>
+          <div class="tier-header-sub">Full team sign-off · ~10 mi beyond core</div>
+        </div><div class="chevron">▼</div>
+      </div>
+      <div class="tier-body" id="body-t3"></div>
+    </div>
+    <div class="coverage-note">Cities not listed are assessed by distance. When in doubt, treat as Tier 3.</div>
+  </div>
+</main>
+<script>
+var cityData = {
+  1: {
+    "San Fernando Valley": ["Thousand Oaks","Agoura Hills","Calabasas","Westlake Village","Oak Park","Woodland Hills","Tarzana","Encino","Sherman Oaks","Van Nuys","Studio City","Burbank","Glendale","Pasadena","Alhambra"],
+    "Westside / Mid-City": ["Malibu","Pacific Palisades","Brentwood","Santa Monica","Venice","Mar Vista","Culver City","West Hollywood","Beverly Hills","Bel Air","Century City","Westwood","Palms","Playa Vista","Playa del Rey","Marina del Rey","El Segundo"],
+    "South Bay": ["Manhattan Beach","Hermosa Beach","Redondo Beach","Torrance","Hawthorne","Lawndale","Inglewood","Gardena","Carson"],
+    "Gateway / East LA": ["Monterey Park","Rosemead","San Gabriel","Temple City","Arcadia","Monrovia","Whittier","Pico Rivera","Downey","Norwalk","Cerritos","Lakewood","Bellflower","Paramount","Compton","Lynwood","South Gate","Huntington Park","Bell","Maywood","Commerce"],
+    "Long Beach Area": ["Long Beach","Signal Hill","Wilmington","San Pedro","Harbor City","Rancho Palos Verdes","Rolling Hills Estates","Lomita"]
+  },
+  2: {
+    "North of Thousand Oaks": ["Moorpark","Simi Valley","Camarillo","Oxnard","Ventura","Port Hueneme"],
+    "Inland NW": ["Chatsworth","Northridge","Granada Hills","Reseda","Canoga Park","West Hills","Winnetka"],
+    "East expansion": ["Covina","West Covina","Baldwin Park","El Monte","South El Monte","Irwindale","Azusa","Duarte","Glendora"],
+    "South of Long Beach": ["Seal Beach","Los Alamitos","Cypress","Artesia","Hawaiian Gardens","La Palma","Buena Park"]
+  },
+  3: {
+    "Ventura County edge": ["Santa Paula","Fillmore","Ojai"],
+    "Inland Empire west": ["Pomona","Claremont","Ontario","Chino","Chino Hills","Diamond Bar","Rowland Heights","La Habra Heights","Walnut"],
+    "North OC": ["Anaheim","Fullerton","Placentia","Yorba Linda","Brea","La Habra","Orange","Villa Park"],
+    "Central OC": ["Garden Grove","Westminster","Fountain Valley","Huntington Beach","Costa Mesa","Santa Ana"],
+    "Irvine & 5-mile radius": ["Irvine","Tustin","Lake Forest","Portola Hills","Laguna Hills","Aliso Viejo","Mission Viejo","Foothill Ranch"],
+    "Newport Beach & 5-mile radius": ["Newport Beach","Corona del Mar","Newport Coast","Balboa Island","East Bluff","Dover Shores"]
+  }
+};
+var projects = [
+  {name:"Kitchen remodel",icon:"🍳",tier:1},{name:"Bathroom remodel",icon:"🚿",tier:1},
+  {name:"Interior spaces",icon:"🛋️",tier:1},{name:"Flooring & tile",icon:"⬜",tier:1},
+  {name:"Bedroom renovation",icon:"🛏️",tier:1},{name:"Paint & finishes",icon:"🖌️",tier:1},
+  {name:"Landscape / hardscape",icon:"🌿",tier:2},{name:"Backyard / patio",icon:"☀️",tier:2},
+  {name:"Pool & spa",icon:"🏊",tier:2},{name:"ADU / garage conversion",icon:"🏠",tier:2},
+  {name:"Room addition",icon:"➕",tier:2},{name:"Deck / pergola",icon:"🌲",tier:2},
+  {name:"Roofing",icon:"🏗️",tier:3},{name:"Windows & doors",icon:"🪟",tier:3},
+  {name:"HVAC",icon:"❄️",tier:3},{name:"Foundation / structural",icon:"🔩",tier:3},
+  {name:"Whole-home remodel",icon:"🏡",tier:3},{name:"Other",icon:"📋",tier:3}
+];
+var allCities=[];
+[1,2,3].forEach(function(t){Object.keys(cityData[t]).forEach(function(r){cityData[t][r].forEach(function(c){allCities.push({name:c,tier:t});});});});
+var projGrid=document.getElementById('proj-grid');
+var state={selectedCity:null,selectedProject:null,tier:null,msg1:'',msg2:''};
+projects.forEach(function(p){var btn=document.createElement('div');btn.className='proj-btn';btn.innerHTML='<div class="proj-icon">'+p.icon+'</div><div class="proj-name">'+p.name+'</div><div class="proj-tier-label">Tier '+p.tier+'</div>';btn.onclick=function(){document.querySelectorAll('.proj-btn').forEach(function(b){b.classList.remove('selected');});btn.classList.add('selected');state.selectedProject=p;};projGrid.appendChild(btn);});
+[1,2,3].forEach(function(tier){var body=document.getElementById('body-t'+tier);Object.keys(cityData[tier]).forEach(function(region){var block=document.createElement('div');block.className='region-block';var html='<div class="region-name">'+region+'</div><div class="city-grid">';cityData[tier][region].forEach(function(c){html+='<div class="city-item">'+c+'</div>';});html+='</div>';block.innerHTML=html;body.appendChild(block);});});
+(function(){var t=new Date();document.getElementById('appt-date').value=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');})();
+function updateClock(){var now=new Date();var h=now.getHours(),m=now.getMinutes(),ampm=h>=12?'PM':'AM';h=h%12||12;document.getElementById('clock-time').textContent=h+':'+(m<10?'0':'')+m+' '+ampm;document.getElementById('clock-day').textContent=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][now.getDay()];var inH=now.getDay()>=1&&now.getDay()<=6&&now.getHours()>=8&&now.getHours()<17;document.getElementById('hours-note').textContent=inH?'':'Outside business hours — queue this lead for review.';}
+updateClock();setInterval(updateClock,30000);
+function isBusinessHours(){var n=new Date();return n.getDay()>=1&&n.getDay()<=6&&n.getHours()>=8&&n.getHours()<17;}
+var dropdownTimer=null;
+function onCityInput(){var val=document.getElementById('city-input').value.trim().toLowerCase();document.getElementById('city-clear').classList.toggle('show',val.length>0);state.selectedCity=null;if(val.length<1){hideDropdown();return;}var matches=allCities.filter(function(c){return c.name.toLowerCase().indexOf(val)===0;}).concat(allCities.filter(function(c){return c.name.toLowerCase().indexOf(val)>0;})).filter(function(c,i,a){return a.indexOf(c)===i;}).slice(0,8);var dd=document.getElementById('city-dropdown');if(matches.length===0){dd.innerHTML='<div class="no-results">No cities found</div>';}else{dd.innerHTML=matches.map(function(c){var badge='<span class="tier-badge-sm tb-'+c.tier+'">T'+c.tier+'</span>';var hl=c.name.replace(new RegExp('^('+val+')','i'),'<strong>$1</strong>');return '<div class="dropdown-item" onmousedown="selectCity(\''+c.name+'\','+c.tier+')">'+hl+' '+badge+'</div>';}).join('');}dd.classList.add('show');}
+function selectCity(name,tier){state.selectedCity={name:name,tier:tier};document.getElementById('city-input').value=name;document.getElementById('city-clear').classList.add('show');hideDropdown();}
+function hideDropdown(){document.getElementById('city-dropdown').classList.remove('show');}
+function hideDropdownDelayed(){dropdownTimer=setTimeout(hideDropdown,150);}
+function clearCity(){document.getElementById('city-input').value='';document.getElementById('city-clear').classList.remove('show');state.selectedCity=null;hideDropdown();}
+function formatAppt(){var dv=document.getElementById('appt-date').value;var tv=document.getElementById('appt-time').value;if(!dv&&!tv)return null;var parts=[];if(dv){var d=new Date(dv+'T12:00:00');var days=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];var months=['January','February','March','April','May','June','July','August','September','October','November','December'];parts.push(days[d.getDay()]+', '+months[d.getMonth()]+' '+d.getDate()+', '+d.getFullYear());}if(tv){var tp=tv.split(':'),th=parseInt(tp[0]),tm=parseInt(tp[1]),ta=th>=12?'PM':'AM';th=th%12||12;parts.push(th+':'+(tm<10?'0':'')+tm+' '+ta);}return parts.join(' at ');}
+function triage(){if(!state.selectedCity){alert('Please search and select a city.');return;}if(!state.selectedProject){alert('Please select a project type.');return;}var appt=formatAppt();if(!appt){alert('Please select an appointment date and time.');return;}var city=state.selectedCity;var proj=state.selectedProject;var finalTier=Math.max(city.tier,proj.tier);state.tier=finalTier;var card=document.getElementById('result-card1');var ahBanner=document.getElementById('after-hours-banner');var scriptWrap=document.getElementById('script-wrap1');var nextBtn=document.getElementById('next-btn');ahBanner.textContent='';ahBanner.classList.remove('show');if(!isBusinessHours()){ahBanner.textContent='Outside business hours (Mon–Sat 8am–5pm). Hold — do not accept until business hours resume.';ahBanner.classList.add('show');}var configs={1:{cls:'r-t1',eyebrow:'Tier 1 — auto-accept',headline:'Accept immediately',desc:'Interior scope in the core zone. Whoever sees this first confirms — no check-in needed.',pills:['Auto-accept','No check-in needed']},2:{cls:'r-t2',eyebrow:'Tier 2 — founders must align',headline:'Text each other first',desc:'Quick sync between Walter and Cecilia before accepting. Sales team not required.',pills:['Walter + Cecilia sync','No sales team needed']},3:{cls:'r-t3',eyebrow:'Tier 3 — full team sign-off',headline:'Loop in sales team too',desc:'Founders must align AND a sales rep must confirm capacity before accepting.',pills:['Founders must align','Sales confirmation required']}};var c=configs[finalTier];card.className='result-card '+c.cls;card.innerHTML='<div class="result-eyebrow">'+c.eyebrow+'</div><div class="result-headline">'+c.headline+'</div><div class="result-desc">'+c.desc+'</div><div class="pill-row">'+c.pills.map(function(p){return '<span class="pill">'+p+'</span>';}).join('')+'</div>';state.msg1='📋 HCW LEAD ALERT\n\nProject: '+proj.name+'\nCity: '+city.name+'\nAppointment: '+appt;document.getElementById('script-text1').textContent=state.msg1;scriptWrap.style.display='block';nextBtn.style.display='block';show('result1-view');hide('step1-view');}
+function goStep2(){show('step2-view');hide('result1-view');}
+function goBackToResult1(){show('result1-view');hide('step2-view');}
+function buildBriefing(){var name=document.getElementById('client-name').value.trim();var addr=document.getElementById('client-address').value.trim();var phone=document.getElementById('client-phone').value.trim();var scope=document.getElementById('client-scope').value.trim();var appt=formatAppt();var proj=state.selectedProject;var city=state.selectedCity;var lines=['📋 HCW LEAD BRIEFING',''];lines.push('— LEAD INFO —');if(proj)lines.push('Project: '+proj.name);if(city)lines.push('City: '+city.name);if(appt)lines.push('Appointment: '+appt);lines.push('');lines.push('— CLIENT —');lines.push('Name: '+(name||'—'));lines.push('Address: '+(addr||'—'));if(phone)lines.push('Phone: '+phone);if(scope){lines.push('');lines.push('— SCOPE —');lines.push(scope);}state.msg2=lines.join('\n');document.getElementById('script-text2').textContent=state.msg2;show('result2-view');hide('step2-view');}
+function show(id){document.getElementById(id).style.display='block';}
+function hide(id){document.getElementById(id).style.display='none';}
+function showPage(id,tab){document.querySelectorAll('.page').forEach(function(p){p.classList.remove('active');});document.querySelectorAll('.tab').forEach(function(t){t.classList.remove('active');});document.getElementById('page-'+id).classList.add('active');tab.classList.add('active');}
+function toggleTier(header){var open=header.classList.contains('open');header.classList.toggle('open',!open);header.nextElementSibling.classList.toggle('open',!open);}
+function copyMsg(n){var msg=n===1?state.msg1:state.msg2;var btn=document.getElementById('copy-btn'+n);if(!msg)return;navigator.clipboard&&navigator.clipboard.writeText(msg).then(function(){btn.textContent='✓ Copied!';setTimeout(function(){btn.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy message';},2000);}); }
+function openWA(e,n){e.preventDefault();var msg=n===1?state.msg1:state.msg2;if(msg)window.location.href='whatsapp://send?text='+encodeURIComponent(msg);}
+function resetAll(){state={selectedCity:null,selectedProject:null,tier:null,msg1:'',msg2:''};document.getElementById('city-input').value='';document.getElementById('city-clear').classList.remove('show');document.querySelectorAll('.proj-btn').forEach(function(b){b.classList.remove('selected');});document.getElementById('client-name').value='';document.getElementById('client-address').value='';document.getElementById('client-phone').value='';document.getElementById('client-scope').value='';document.getElementById('appt-time').value='';var t=new Date();document.getElementById('appt-date').value=t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');['result1-view','step2-view','result2-view'].forEach(hide);show('step1-view');}
+</script>
+</body>
+</html>
